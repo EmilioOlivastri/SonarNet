@@ -18,8 +18,8 @@ from evaluate import evaluate
 from model import UNet
 from utils.data_loading import SonarDataset
 
-dir_img = Path('../plet/imgs/')
-dir_labels = Path('../plet/labels/')
+dir_img = Path('./data/plet/imgs/')
+dir_labels = Path('./data/plet/labels/')
 dir_checkpoint = Path('./checkpoints/')
 
 
