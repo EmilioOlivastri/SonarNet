@@ -1,7 +1,5 @@
-import logging
 import numpy as np
 import torch
-import torchvision
 from torchvision.io import read_image
 import torchvision.transforms as T
 from PIL import Image
@@ -9,17 +7,6 @@ from os import listdir
 from pathlib import Path
 from torch.utils.data import Dataset
 from tqdm import tqdm
-
-
-def load_image(filename):
-    ext = splitext(filename)[1]
-    if ext == '.npy':
-        return Image.fromarray(np.load(filename))
-    elif ext in ['.pt', '.pth']:
-        return Image.fromarray(torch.load(filename).numpy())
-    else:
-        return Image.open(filename)
-
   
 class SonarDataset(Dataset):
     def __init__(self, images_dir: str, mask_dir: str, scale: float = 1.0):
@@ -77,4 +64,3 @@ class SonarDataset(Dataset):
             'image': img.float().contiguous(),
             'mask' : mask.float().contiguous()
         }
-
