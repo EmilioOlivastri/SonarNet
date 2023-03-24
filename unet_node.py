@@ -5,6 +5,7 @@ import rospy
 from nps_uw_multibeam_sonar.msg import SonarImgHeat
 
 import numpy as np
+import math
 from cv_bridge import CvBridge
 import cv2 as cv
 import torch
@@ -27,6 +28,9 @@ class SonarObjectDetector:
         state_dict = torch.load(model, map_location=self.device)
         state_dict.pop('mask_values', [0, 1])
         self.net.load_state_dict(state_dict)
+        self.err_x = 0.0
+        self.err_y = 0.0
+        self.counter = 0
         print(f'Model = {model} loaded successfully!')
 
     # Create a callback function for the subscriber.
@@ -45,13 +49,24 @@ class SonarObjectDetector:
                             device=self.device,
                             scale_factor=0.5).astype(cv2_heat.dtype)
 
-        print(f"Idx Max Label = {label.max()}")
-        print(f"Idx Max GT = {cv2_heat.max()}")
+        col_l = label.argmax() / label.shape[0]
+        row_l = label.argmax() / label.shape[1] 
+        #print(f"Idx Max Label = ({row_l}, {col_l})")
+        col_gt = cv2_heat.argmax() / label.shape[0]
+        row_gt = cv2_heat.argmax() / label.shape[1]
+        #print(f"Idx Max GT = ({row_gt}, {col_gt})")
 
-        cv.imshow("Sonar Img", cv2_img)
-        cv.imshow("Heat", cv2_heat)
-        cv.imshow("Predicted Heat", label)
-        cv.waitKey(10)
+        self.counter += 1
+        self.err_y += (col_l - col_gt) * (col_l - col_gt)
+        self.err_x += (row_l - row_gt) * (row_l - row_gt)
+
+        if self.counter % 5 == 0 :
+            print(f"MSE = {math.sqrt((self.err_x + self.err_y) / self.counter)}")
+
+        #cv.imshow("Sonar Img", cv2_img)
+        #cv.imshow("Heat", cv2_heat)
+        #cv.imshow("Predicted Heat", label)
+        #cv.waitKey(10)
 
     # This ends up being the main while loop.
     def listener(self):
