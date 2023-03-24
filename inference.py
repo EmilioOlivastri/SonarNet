@@ -41,7 +41,7 @@ def get_args():
                         help='Scale factor for the input images')
     parser.add_argument('--bilinear', action='store_true', default=False, help='Use bilinear upsampling')
     parser.add_argument('--classes', '-c', type=int, default=1, help='Number of classes')
-    
+   
     return parser.parse_args()
 
 
@@ -79,6 +79,7 @@ if __name__ == '__main__':
     
     transform = transforms.Compose([
     transforms.PILToTensor()])
+
 
     for i, filename in enumerate(in_files):
         logging.info(f'Predicting image {filename} ...')
