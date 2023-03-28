@@ -9,12 +9,12 @@ from tqdm import tqdm
 
 import wandb
 from evaluate import evaluate
-from model import UNet
+from model import SonarNet
 from utils.data_loading import SonarDataset
 
-dir_img = Path('./data/plet/imgs/')
-dir_labels = Path('./data/plet/labels/')
-dir_checkpoint = Path('./checkpoints/')
+dir_img = Path('../data/plet/imgs/')
+dir_labels = Path('../data/plet/labels/')
+dir_checkpoint = Path('../checkpoints/')
 
 
 def train_model(
@@ -63,7 +63,8 @@ def train_model(
     # 4. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling
     optimizer = optim.RMSprop(model.parameters(),
                               lr=learning_rate, weight_decay=weight_decay, momentum=momentum)
-    criterion = torch.nn.MSELoss()
+    criterion_heat = torch.nn.MSELoss()
+    criterion_yaw  = torch.nn.CrossEntropyLoss()
     global_step = 0
 
     # 5. Begin training
@@ -84,21 +85,29 @@ def train_model(
 
                 optimizer.zero_grad()
                                 
-                masks_pred = model(images)
+                masks_pred, yaw_pred = model(images)
+
+                # Prediction of HeatMap
                 true_masks = torch.unsqueeze(true_masks, dim=1)
-                loss = criterion(masks_pred, true_masks)
-                loss.backward()
+                loss_heat = criterion_heat(masks_pred, true_masks)
+                loss_heat.backward()
                 optimizer.step()
 
+                # Prediction of Yaw
+                loss_yaw = criterion_yaw(yaw_pred, true_masks)
+                loss_yaw.backward()
+                optimizer.step()
+
+                # Unchanged
                 pbar.update(images.shape[0])
                 global_step += 1
-                epoch_loss += loss.item()
+                epoch_loss += loss_heat.item() + loss_yaw.item()
                 experiment.log({
-                    'train loss': loss.item(),
+                    'train loss': [loss_heat.item(), loss_yaw.item()],
                     'step': global_step,
                     'epoch': epoch
                 })
-                pbar.set_postfix(**{'loss (batch)': loss.item()})
+                pbar.set_postfix(**{'loss (batch)': [loss_heat.item(), loss_yaw.item()]})
 
                 # Evaluation round
                 division_step = (n_train // (5 * batch_size))
@@ -164,7 +173,7 @@ if __name__ == '__main__':
     # Change here to adapt to your data
     # n_channels=3 for RGB images
     # n_classes is the number of probabilities you want to get per pixel
-    model = UNet(n_channels=3, n_classes=args.classes, bilinear=args.bilinear)
+    model = SonarNet(n_channels=3, n_classes=args.classes, n_angles=180)
     model = model.to(memory_format=torch.channels_last)
 
     logging.info(f'Network:\n'
@@ -203,4 +212,3 @@ if __name__ == '__main__':
             img_scale=args.scale,
             val_percent=args.val / 100
         )
-

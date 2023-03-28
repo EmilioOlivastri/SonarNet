@@ -32,7 +32,7 @@ class SonarNet(nn.Module):
         nn.ReLU(True),
 
         # 3 Linear Layer
-        nn.Linear(4 * 128, 180)) 
+        nn.Linear(4 * 128, self.n_angles)) 
 
         # Head that works for pose estimation using the heatmap
         self.up1 = (Up(256, 128 // factor, self.bilinear))

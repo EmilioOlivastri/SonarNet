@@ -6,7 +6,6 @@ from PIL import Image
 from os import listdir
 from pathlib import Path
 from torch.utils.data import Dataset
-from tqdm import tqdm
   
 class SonarDataset(Dataset):
     def __init__(self, images_dir: str, mask_dir: str, scale: float = 1.0):
