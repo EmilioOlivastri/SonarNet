@@ -43,7 +43,7 @@ class SonarObjectDetector:
 
         cv2_img_rbg = cv2_img_rbg.transpose(2, 0, 1) 
         tensor_img = torch.from_numpy(cv2_img_rbg)
-        #print(f'Img Shape = {cv2_img.shape}')
+        print(f'Img Shape = {cv2_img.shape}')
         label = predict_img(net=self.net,
                             full_img=tensor_img,
                             device=self.device,
