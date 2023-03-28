@@ -6,18 +6,22 @@ from PIL import Image
 from os import listdir
 from pathlib import Path
 from torch.utils.data import Dataset
-  
+import math
+
 class SonarDataset(Dataset):
-    def __init__(self, images_dir: str, mask_dir: str, scale: float = 1.0):
+    def __init__(self, images_dir: str, mask_dir: str, angle_dir: str, scale: float = 1.0):
         self.images_dir = Path(images_dir)
         self.mask_dir = Path(mask_dir)
+        self.angle_dir = Path(angle_dir)
         assert 0 < scale <= 1, 'Scale must be between 0 and 1'
         self.scale = scale
         
         self.imgs = listdir(self.images_dir)
-        self.labels = listdir(self.mask_dir)
+        self.labels_heat = listdir(self.mask_dir)
+        self.labels_yaw = listdir(self.angle_dir)
         self.imgs.sort()
-        self.labels.sort()
+        self.labels_heat.sort()
+        self.labels_yaw.sort()
         
         if not self.imgs:
             raise RuntimeError(f'No input file found in {images_dir}, make sure you put your images there')
@@ -27,12 +31,11 @@ class SonarDataset(Dataset):
         return len(self.imgs)
 
     @staticmethod
-    def preprocess(tensor_img, scale):
+    def preprocessImg(tensor_img, scale):
         
         transform = T.ToPILImage()
         pil_img = transform(tensor_img)
         w, h = pil_img.size
-        #print(f"W = {w} and H = {h}")
         newW, newH = int(scale * w), int(scale * h)
         assert newW > 0 and newH > 0, 'Scale is too small, resized images would have no pixel'
         
@@ -44,22 +47,44 @@ class SonarDataset(Dataset):
           img = img.transpose((2, 0, 1))
           
         return torch.from_numpy(img.astype(float))
+    
+
+    @staticmethod
+    def preprocessYaw(angle_txt, discretized_size):
+        
+        with open(angle_txt) as f:
+            yaw = float(f.readlines()[0].replace('\n', '')) 
+        
+        step_cell = ( math.pi * 2 )/ float(discretized_size)
+
+        np_yaw = np.zeros(discretized_size)
+        arr_idx = int( yaw / step_cell ) % discretized_size
+        np_yaw[arr_idx] = 1.0
+        
+        # TODO : Add Gaussian in the vicinities of correct angle
+
+
+        return torch.from_numpy(np_yaw.astype(float))
 
     def __getitem__(self, idx):
     
         img_name = self.imgs[idx]
-        label_name = self.labels[idx]
+        label_heat_name = self.labels_heat[idx]
+        label_yaw_name = self.labels_yaw[idx]
         
         assert len(img_name) != 1, f'Either no image or multiple images found for the ID {img_name}: {img_name}'
-        assert len(label_name) != 1, f'Either no mask or multiple masks found for the ID {img_name}: {img_name}'
+        assert len(label_heat_name) != 1, f'Either no mask or multiple masks found for the ID {img_name}: {img_name}'
         
-        label = read_image(str(self.mask_dir) + '/' + label_name)
+        heat  = read_image(str(self.mask_dir) + '/' + label_heat_name)
         img   = read_image(str(self.images_dir) + '/' + img_name)
 
-        img = self.preprocess(img, self.scale)
-        mask = self.preprocess(label, self.scale)
+        img        = self.preprocessImg(img, self.scale)
+        mask_heat  = self.preprocessImg(heat, self.scale)
+        yaw_label  = self.preprocessYaw(label_yaw_name, 180) 
+
 
         return {
             'image': img.float().contiguous(),
-            'mask' : mask.float().contiguous()
+            'mask_heat' : mask_heat.float().contiguous(),
+            'yaw_label' : yaw_label.float().contiguous()
         }
