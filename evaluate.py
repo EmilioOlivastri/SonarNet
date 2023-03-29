@@ -18,13 +18,13 @@ def evaluate(net, dataloader, device):
         # move images and labels to correct device and type
         image = image.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
         true_masks = true_masks.to(device=device, dtype=torch.float32)
-        yaw_pred = yaw_pred.to(device=device, dtype=torch.float32)
+        true_yaws = true_yaws.to(device=device, dtype=torch.float32)
 
         # Predict mask and angle
         heat_pred, yaw_pred = net(image)
 
         # Computing the losses
-        mask_true = torch.unsqueeze(mask_true, dim=1)
+        true_masks = torch.unsqueeze(true_masks, dim=1)
         loss_heat = criterion_heat(heat_pred, true_masks)
         loss_yaw = criterion_yaw(yaw_pred, true_yaws)
 

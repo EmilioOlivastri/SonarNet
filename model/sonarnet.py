@@ -23,8 +23,10 @@ class SonarNet(nn.Module):
         
         self.yaw_estim = nn.Sequential(
         
+        nn.MaxPool1d(4, stride=4),
+
         # 2 Linear Layer
-        nn.Linear(12 * 16 * 256, 16 * 256),
+        nn.Linear(48 * 256, 16 * 256),
         nn.ReLU(True),
 
         # 2 Linear Layer
@@ -51,7 +53,8 @@ class SonarNet(nn.Module):
         x5 = self.down4(x4)
         
         # FC Net
-        y = self.yaw_estim(x5)
+        y0 = self.flatten(x5)
+        y = self.yaw_estim(y0)
         
         # Decoder
         x = self.up1(x5, x4)

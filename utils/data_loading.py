@@ -72,7 +72,7 @@ class SonarDataset(Dataset):
             left_idx = delta if delta else discretized_size + delta
             np_yaw[right_idx] = np_yaw[left_idx] = const_factor * np.exp( - (f_delta)**2 / (2 * var) ) * 0.3
 
-        print(np_yaw)
+        #print(np_yaw)
 
         return torch.from_numpy(np_yaw.astype(float))
 
@@ -87,10 +87,10 @@ class SonarDataset(Dataset):
         
         heat  = read_image(str(self.mask_dir) + '/' + label_heat_name)
         img   = read_image(str(self.images_dir) + '/' + img_name)
-
+        
         img        = self.preprocessImg(img, self.scale)
         mask_heat  = self.preprocessImg(heat, self.scale)
-        yaw_label  = self.preprocessYaw(label_yaw_name, 180) 
+        yaw_label  = self.preprocessYaw(str(self.angle_dir) + '/' + label_yaw_name, 180) 
 
 
         return {

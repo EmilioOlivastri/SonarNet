@@ -12,9 +12,9 @@ from evaluate import evaluate
 from model import SonarNet
 from utils.data_loading import SonarDataset
 
-dir_img = Path('../data/plet/imgs/')
-dir_heats = Path('../data/plet/heat/')
-dir_yaws = Path('../data/plet/yaw/')
+dir_img = Path('../plet/imgs/')
+dir_heats = Path('../plet/heat/')
+dir_yaws = Path('../plet/yaw/')
 dir_checkpoint = Path('../checkpoints/')
 
 
@@ -148,7 +148,7 @@ def train_model(
         if save_checkpoint:
             Path(dir_checkpoint).mkdir(parents=True, exist_ok=True)
             state_dict = model.state_dict()
-            state_dict['mask_values'] = dataset.labels
+            state_dict['mask_values'] = dataset.labels_heat
             if ( epoch % 5 == 0 and val_score < best_score ) :
                 best_score = val_score
                 torch.save(state_dict, str(dir_checkpoint / 'checkpoint_epoch{}.pth'.format(epoch)))
