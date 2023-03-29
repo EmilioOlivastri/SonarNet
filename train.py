@@ -98,7 +98,7 @@ def train_model(
                 loss_yaw = criterion_yaw(yaw_pred, true_yaws)
                 
                 # Sum of losses 
-                loss = loss_heat + loss_yaw 
+                loss = loss_heat + loss_yaw
                 loss.backward()
                 optimizer.step()
 
@@ -113,7 +113,10 @@ def train_model(
                     'step': global_step,
                     'epoch': epoch
                 })
-                pbar.set_postfix(**{'loss (batch)': [loss_heat.item(), loss_yaw.item()]})
+                pbar.set_postfix(**{'loss_heat (batch)': loss_heat.item(), 
+                                    'loss_yaw (batch)' : loss_yaw.item(),
+                                    'loss (batch)'     : loss.item(),
+                                    })
 
                 # Evaluation round
                 division_step = (n_train // (5 * batch_size))
@@ -181,7 +184,7 @@ if __name__ == '__main__':
     # Change here to adapt to your data
     # n_channels=3 for RGB images
     # n_classes is the number of probabilities you want to get per pixel
-    model = SonarNet(n_channels=3, n_classes=args.classes, n_angles=180)
+    model = SonarNet(n_channels=3, n_classes=args.classes, n_angles=36)
     model = model.to(memory_format=torch.channels_last)
 
     logging.info(f'Network:\n'

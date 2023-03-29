@@ -90,7 +90,7 @@ class SonarDataset(Dataset):
         
         img        = self.preprocessImg(img, self.scale)
         mask_heat  = self.preprocessImg(heat, self.scale)
-        yaw_label  = self.preprocessYaw(str(self.angle_dir) + '/' + label_yaw_name, 180) 
+        yaw_label  = self.preprocessYaw(str(self.angle_dir) + '/' + label_yaw_name, 36) 
 
 
         return {
