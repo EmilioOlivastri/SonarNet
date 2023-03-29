@@ -15,7 +15,7 @@ class SonarDataset(Dataset):
         self.angle_dir = Path(angle_dir)
         assert 0 < scale <= 1, 'Scale must be between 0 and 1'
         self.scale = scale
-        
+    
         self.imgs = listdir(self.images_dir)
         self.labels_heat = listdir(self.mask_dir)
         self.labels_yaw = listdir(self.angle_dir)
@@ -52,6 +52,9 @@ class SonarDataset(Dataset):
     @staticmethod
     def preprocessYaw(angle_txt, discretized_size):
         
+        var = np.pi / discretized_size
+        const_factor = 1 / ( np.sqrt(2 * np.pi * var))
+
         with open(angle_txt) as f:
             yaw = float(f.readlines()[0].replace('\n', '')) 
         
@@ -60,9 +63,16 @@ class SonarDataset(Dataset):
         np_yaw = np.zeros(discretized_size)
         arr_idx = int( yaw / step_cell ) % discretized_size
         np_yaw[arr_idx] = 1.0
-        
-        # TODO : Add Gaussian in the vicinities of correct angle
+    
+        # Angle follows gaussian distribution
+        for idx in range(1, 5) :
+            right_idx = arr_idx + idx % discretized_size
+            delta = arr_idx - idx
+            f_delta = step_cell * idx
+            left_idx = delta if delta else discretized_size + delta
+            np_yaw[right_idx] = np_yaw[left_idx] = const_factor * np.exp( - (f_delta)**2 / (2 * var) ) * 0.3
 
+        print(np_yaw)
 
         return torch.from_numpy(np_yaw.astype(float))
 

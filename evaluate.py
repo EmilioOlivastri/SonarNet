@@ -1,5 +1,4 @@
 import torch
-from torch import nn
 from tqdm import tqdm
 
 
@@ -9,22 +8,28 @@ def evaluate(net, dataloader, device):
     num_val_batches = len(dataloader)
     score = 0
 
-    loss = torch.nn.MSELoss()
+    criterion_heat = torch.nn.MSELoss()
+    criterion_yaw  = torch.nn.CrossEntropyLoss()
 
     # iterate over the validation set
     for batch in tqdm(dataloader, total=num_val_batches, desc='Validation round', unit='batch', leave=False):
-        image, mask_true = batch['image'], batch['mask']
+        image, true_masks, true_yaws = batch['image'], batch['mask_heat'], batch['yaw_label'] 
 
         # move images and labels to correct device and type
         image = image.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
-        mask_true = mask_true.to(device=device, dtype=torch.float32)
+        true_masks = true_masks.to(device=device, dtype=torch.float32)
+        yaw_pred = yaw_pred.to(device=device, dtype=torch.float32)
 
-        # predict the mask
+        # Predict mask and angle
+        heat_pred, yaw_pred = net(image)
+
+        # Computing the losses
         mask_true = torch.unsqueeze(mask_true, dim=1)
-        mask_pred = net(image)
-        
+        loss_heat = criterion_heat(heat_pred, true_masks)
+        loss_yaw = criterion_yaw(yaw_pred, true_yaws)
+
         # Add error metrix for this
-        score += loss(mask_pred, mask_true)
+        score += loss_heat + loss_yaw
         
     net.train()
     return score / max(num_val_batches, 1)

@@ -13,7 +13,8 @@ from model import SonarNet
 from utils.data_loading import SonarDataset
 
 dir_img = Path('../data/plet/imgs/')
-dir_labels = Path('../data/plet/labels/')
+dir_heats = Path('../data/plet/heat/')
+dir_yaws = Path('../data/plet/yaw/')
 dir_checkpoint = Path('../checkpoints/')
 
 
@@ -30,7 +31,7 @@ def train_model(
         momentum: float = 0.999,
 ):
     # 1. Create dataset
-    dataset = SonarDataset(dir_img, dir_labels, img_scale)
+    dataset = SonarDataset(dir_img, dir_heats, dir_yaws, img_scale)
     
     # 2. Split into train / validation partitions
     n_val = int(len(dataset) * val_percent)
@@ -66,6 +67,7 @@ def train_model(
     criterion_heat = torch.nn.MSELoss()
     criterion_yaw  = torch.nn.CrossEntropyLoss()
     global_step = 0
+    best_score = 1000000
 
     # 5. Begin training
     for epoch in range(1, epochs + 1):
@@ -73,7 +75,7 @@ def train_model(
         epoch_loss = 0
         with tqdm(total=n_train, desc=f'Epoch {epoch}/{epochs}', unit='img') as pbar:
             for batch in train_loader:
-                images, true_masks = batch['image'], batch['mask']
+                images, true_masks, true_yaws = batch['image'], batch['mask_heat'], batch['yaw_label']
 
                 assert images.shape[1] == model.n_channels, \
                     f'Network has been defined with {model.n_channels} input channels, ' \
@@ -82,6 +84,7 @@ def train_model(
 
                 images = images.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
                 true_masks = true_masks.to(device=device, dtype=torch.float32)
+                true_yaws = true_yaws.to(device=device, dtype=torch.float32)
 
                 optimizer.zero_grad()
                                 
@@ -90,12 +93,13 @@ def train_model(
                 # Prediction of HeatMap
                 true_masks = torch.unsqueeze(true_masks, dim=1)
                 loss_heat = criterion_heat(masks_pred, true_masks)
-                loss_heat.backward()
-                optimizer.step()
-
+                
                 # Prediction of Yaw
-                loss_yaw = criterion_yaw(yaw_pred, true_masks)
-                loss_yaw.backward()
+                loss_yaw = criterion_yaw(yaw_pred, true_yaws)
+                
+                # Sum of losses 
+                loss = loss_heat + loss_yaw 
+                loss.backward()
                 optimizer.step()
 
                 # Unchanged
@@ -103,7 +107,9 @@ def train_model(
                 global_step += 1
                 epoch_loss += loss_heat.item() + loss_yaw.item()
                 experiment.log({
-                    'train loss': [loss_heat.item(), loss_yaw.item()],
+                    'heat train loss': loss_heat.item(), 
+                    'yaw  train loss': loss_yaw.item(),
+                    'full train loss': loss.item(),
                     'step': global_step,
                     'epoch': epoch
                 })
@@ -143,8 +149,10 @@ def train_model(
             Path(dir_checkpoint).mkdir(parents=True, exist_ok=True)
             state_dict = model.state_dict()
             state_dict['mask_values'] = dataset.labels
-            torch.save(state_dict, str(dir_checkpoint / 'checkpoint_epoch{}.pth'.format(epoch)))
-            logging.info(f'Checkpoint {epoch} saved!')
+            if ( epoch % 5 == 0 and val_score < best_score ) :
+                best_score = val_score
+                torch.save(state_dict, str(dir_checkpoint / 'checkpoint_epoch{}.pth'.format(epoch)))
+                logging.info(f'Checkpoint {epoch} saved!')
 
 
 def get_args():
