@@ -61,15 +61,18 @@ class SonarDataset(Dataset):
         step_cell = ( math.pi * 2 )/ float(discretized_size)
 
         np_yaw = np.zeros(discretized_size)
+
+        yaw = yaw if yaw >= 0 else math.pi * 2 + yaw
+
         arr_idx = int( yaw / step_cell ) % discretized_size
         np_yaw[arr_idx] = 1.0
     
         # Angle follows gaussian distribution
         for idx in range(1, 5) :
-            right_idx = arr_idx + idx % discretized_size
+            right_idx = (arr_idx + idx) % discretized_size
             delta = arr_idx - idx
             f_delta = step_cell * idx
-            left_idx = delta if delta else discretized_size + delta
+            left_idx = delta if delta > 0 else (discretized_size + delta) % discretized_size
             np_yaw[right_idx] = np_yaw[left_idx] = const_factor * np.exp( - (f_delta)**2 / (2 * var) ) * 0.3
 
         #print(np_yaw)
