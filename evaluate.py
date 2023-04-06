@@ -23,10 +23,18 @@ def evaluate(net, dataloader, device):
         # Predict mask and angle
         heat_pred, yaw_pred = net(image)
 
+        reduced_yawgt   = torch.zeros([true_yaws.shape[0], int(true_yaws.shape[1] / 2)], dtype=torch.float32).to(device=device)
+        off = reduced_yawgt.shape[1]
+        for idx_batch in range(reduced_yawgt.shape[0]) :
+            for idx_pred in range(reduced_yawgt.shape[1]) :
+                if true_yaws[idx_batch][idx_pred] > 0.0 or true_yaws[idx_batch][idx_pred + off] : 
+                    reduced_yawgt[idx_batch][idx_pred] = 1.0
+
         # Computing the losses
         true_masks = torch.unsqueeze(true_masks, dim=1)
         loss_heat = criterion_heat(heat_pred, true_masks)
-        loss_yaw = criterion_yaw(yaw_pred, true_yaws)
+        #loss_yaw = criterion_yaw(yaw_pred, true_yaws)
+        loss_yaw = criterion_yaw(yaw_pred, reduced_yawgt)
 
         # Add error metrix for this
         score += loss_heat + loss_yaw

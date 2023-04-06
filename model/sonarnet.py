@@ -1,7 +1,8 @@
 """ Full assembly of the parts to form the complete network """
 
 from .unet_parts import *
-
+from sklearn.random_projection import GaussianRandomProjection
+import numpy as np
 
 class SonarNet(nn.Module):
     def __init__(self, n_channels, n_classes, n_angles):
@@ -11,37 +12,41 @@ class SonarNet(nn.Module):
         self.n_angles = n_angles
         self.bilinear = False
 
-        self.inc = (DoubleConv(n_channels, 16))
-        self.down1 = (Down(16, 32))
-        self.down2 = (Down(32, 64))
-        self.down3 = (Down(64, 128))
+        self.inc = (DoubleConv(n_channels, 64))
+        self.down1 = (Down(64, 128))
+        self.down2 = (Down(128, 256))
+        self.down3 = (Down(256, 512))
         factor = 2 if self.bilinear else 1
-        self.down4 = (Down(128, 256 // factor))
+        self.down4 = (Down(512, 1024 // factor))
 
         # Head that works for the angle estimation
+        dummy = np.empty((1, 512*25*32))
+        transformer = GaussianRandomProjection(n_components=300, random_state = 42)
+        transformer.fit(dummy)
+        self.proj_mat = torch.from_numpy(transformer.components_.astype(np.float32)).cuda()
+        self.proj_mat.requires_grad = False
+
         self.flatten = nn.Flatten(start_dim=1)
-        
+
         self.yaw_estim = nn.Sequential(
         
-        nn.MaxPool1d(4, stride=4),
-
-        # 2 Linear Layer
-        nn.Linear(48 * 256, 16 * 256),
+        # 1 Linear Layer
+        nn.Linear(300, 150),
         nn.ReLU(True),
 
         # 2 Linear Layer
-        nn.Linear(16 * 256, 4 * 128),
+        nn.Linear(150, 75),
         nn.ReLU(True),
 
         # 3 Linear Layer
-        nn.Linear(4 * 128, self.n_angles)) 
+        nn.Linear(75, self.n_angles)) 
 
         # Head that works for pose estimation using the heatmap
-        self.up1 = (Up(256, 128 // factor, self.bilinear))
-        self.up2 = (Up(128, 64 // factor, self.bilinear))
-        self.up3 = (Up(64, 32 // factor, self.bilinear))
-        self.up4 = (Up(32, 16, self.bilinear))
-        self.outc = (OutConv(16, n_classes))
+        self.up1 = (Up(1024, 512 // factor, self.bilinear))
+        self.up2 = (Up(512, 256 // factor, self.bilinear))
+        self.up3 = (Up(256, 128 // factor, self.bilinear))
+        self.up4 = (Up(128, 64, self.bilinear))
+        self.outc = (OutConv(64, n_classes))
 
     def forward(self, x):
 
@@ -53,8 +58,11 @@ class SonarNet(nn.Module):
         x5 = self.down4(x4)
         
         # FC Net
-        y0 = self.flatten(x5)
-        y = self.yaw_estim(y0)
+        y0 = self.flatten(x4)
+        y1 = y0.permute(1,0) # featxb
+        y2 = torch.matmul(self.proj_mat, y1)
+        y3 = y2.permute(1, 0)
+        y = self.yaw_estim(y3)
         
         # Decoder
         x = self.up1(x5, x4)

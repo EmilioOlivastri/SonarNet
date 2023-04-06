@@ -1,6 +1,5 @@
 import argparse
 import logging
-import os
 
 import matplotlib.pyplot as plt
 
@@ -18,16 +17,18 @@ def predict_img(net,
                 device,
                 scale_factor=1):
     net.eval()
-    img = SonarDataset.preprocess(full_img, scale_factor)
+    img = SonarDataset.preprocessImg(full_img, scale_factor)
     img = img.unsqueeze(0)
     #print(f"Printed Shape In Predict = {img.shape}")
     img = img.to(device=device, dtype=torch.float32)
 
     with torch.no_grad():
-        output = net(img).cpu()
-        output = F.interpolate(output, (full_img.shape[1], full_img.shape[2]), mode='bilinear')
+        mask, angle = net(img)
+        mask = mask.detach().cpu()
+        angle = angle.detach().cpu()
+        mask = F.interpolate(mask, (full_img.shape[1], full_img.shape[2]), mode='bilinear')
         
-    return output.long().squeeze().numpy()
+    return mask.long().squeeze().numpy(), angle.numpy()
 
 
 def get_args():

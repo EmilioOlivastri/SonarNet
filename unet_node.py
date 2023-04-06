@@ -10,8 +10,6 @@ from cv_bridge import CvBridge
 import cv2 as cv
 import torch
 
-import matplotlib.pyplot as plt
-
 from model import UNet
 from inference import predict_img
 

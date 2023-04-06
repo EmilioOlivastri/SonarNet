@@ -6,6 +6,7 @@ from pathlib import Path
 from torch import optim
 from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
+import numpy as np
 
 import wandb
 from evaluate import evaluate
@@ -86,6 +87,8 @@ def train_model(
                 true_masks = true_masks.to(device=device, dtype=torch.float32)
                 true_yaws = true_yaws.to(device=device, dtype=torch.float32)
 
+                reduced_yawgt   = torch.zeros([true_yaws.shape[0], int(true_yaws.shape[1] / 2)], dtype=torch.float32).to(device=device)
+
                 optimizer.zero_grad()
                                 
                 masks_pred, yaw_pred = model(images)
@@ -95,8 +98,26 @@ def train_model(
                 loss_heat = criterion_heat(masks_pred, true_masks)
                 
                 # Prediction of Yaw
-                loss_yaw = criterion_yaw(yaw_pred, true_yaws)
+                off = reduced_yawgt.shape[1]
+                for idx_batch in range(reduced_yawgt.shape[0]) :
+                    for idx_pred in range(reduced_yawgt.shape[1]) :
+                        if true_yaws[idx_batch][idx_pred] > 0.0 or true_yaws[idx_batch][idx_pred + off] : 
+                            reduced_yawgt[idx_batch][idx_pred] = 1.0
+
+
+                #loss_yaw = criterion_yaw(yaw_pred, true_yaws)
+                #print(f'Sh1 = {yaw_pred.shape} | Sh2 = {reduced_yawgt.shape}')
+                loss_yaw = criterion_yaw(yaw_pred, reduced_yawgt)
                 
+                idxs_preds = np.asarray([torch.argmax(row).cpu() for row in yaw_pred])
+                idxs_true = np.asarray([torch.argmax(row).cpu() for row in reduced_yawgt])
+                #idxs_true = np.asarray([torch.argmax(row).cpu() for row in true_yaws])
+                dist1 = np.absolute(idxs_preds - idxs_true)
+                dist2 = yaw_pred.shape[1] - dist1
+                real_dist = np.asarray([min(dist1[idx], dist2[idx]) for idx in range(len(dist1))])
+                                
+                local_acc = real_dist.sum() / idxs_true.shape[0]   
+
                 # Sum of losses 
                 loss = loss_heat + loss_yaw
                 loss.backward()
@@ -109,6 +130,7 @@ def train_model(
                 experiment.log({
                     'heat train loss': loss_heat.item(), 
                     'yaw  train loss': loss_yaw.item(),
+                    'yaw accuracy' : local_acc,
                     'full train loss': loss.item(),
                     'step': global_step,
                     'epoch': epoch
@@ -152,9 +174,9 @@ def train_model(
             Path(dir_checkpoint).mkdir(parents=True, exist_ok=True)
             state_dict = model.state_dict()
             state_dict['mask_values'] = dataset.labels_heat
-            if ( epoch % 5 == 0 and val_score < best_score ) :
+            if ( val_score < best_score ) :
                 best_score = val_score
-                torch.save(state_dict, str(dir_checkpoint / 'checkpoint_epoch{}.pth'.format(epoch)))
+                torch.save(state_dict, str(dir_checkpoint / 'checkpoint_epoch_best{}.pth'.format(epoch)))
                 logging.info(f'Checkpoint {epoch} saved!')
 
 
@@ -184,7 +206,7 @@ if __name__ == '__main__':
     # Change here to adapt to your data
     # n_channels=3 for RGB images
     # n_classes is the number of probabilities you want to get per pixel
-    model = SonarNet(n_channels=3, n_classes=args.classes, n_angles=36)
+    model = SonarNet(n_channels=3, n_classes=args.classes, n_angles=18)
     model = model.to(memory_format=torch.channels_last)
 
     logging.info(f'Network:\n'
