@@ -21,7 +21,7 @@ class SonarNet(nn.Module):
 
         # Head that works for the angle estimation
         dummy = np.empty((1, 512*25*32))
-        transformer = GaussianRandomProjection(n_components=300, random_state = 42)
+        transformer = GaussianRandomProjection(n_components=1024, random_state = 42)
         transformer.fit(dummy)
         self.proj_mat = torch.from_numpy(transformer.components_.astype(np.float32)).cuda()
         self.proj_mat.requires_grad = False
@@ -31,15 +31,23 @@ class SonarNet(nn.Module):
         self.yaw_estim = nn.Sequential(
         
         # 1 Linear Layer
-        nn.Linear(300, 150),
+        nn.Linear(1024, 512),
         nn.ReLU(True),
 
         # 2 Linear Layer
-        nn.Linear(150, 75),
+        nn.Linear(512, 256),
         nn.ReLU(True),
 
         # 3 Linear Layer
-        nn.Linear(75, self.n_angles)) 
+        nn.Linear(256, 128),
+        nn.ReLU(True),
+
+        # 4 Linear Layer
+        nn.Linear(128, 64),
+        nn.ReLU(True),
+
+        # 3 Linear Layer
+        nn.Linear(64, self.n_angles)) 
 
         # Head that works for pose estimation using the heatmap
         self.up1 = (Up(1024, 512 // factor, self.bilinear))
