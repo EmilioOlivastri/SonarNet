@@ -42,8 +42,8 @@ class SonarDataset(Dataset):
         pil_img = pil_img.resize((newW, newH), resample=Image.BICUBIC)
         img = np.asarray(pil_img)
 
+        img = img / 255.0
         if ( len(img.shape) == 3 ) :
-          img = img / 255.0
           img = img.transpose((2, 0, 1))
           
         return torch.from_numpy(img.astype(float))
