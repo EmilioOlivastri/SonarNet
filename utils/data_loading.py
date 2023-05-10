@@ -8,6 +8,7 @@ from pathlib import Path
 from torch.utils.data import Dataset
 import math
 from utils.cfar.CFAR import CFAR
+import matplotlib.pyplot as plt
 
 class SonarDataset(Dataset):
     def __init__(self, images_dir: str, mask_dir: str, angle_dir: str, scale: float = 1.0):
@@ -68,6 +69,18 @@ class SonarDataset(Dataset):
 
         peaks = cfar_detector.detect(img, 'GOCA')
         peaks &= img > 10
+
+        '''
+        _, ax = plt.subplots(1, 2)
+        ax[0].set_title('Input image')
+        ax[0].imshow(img)
+        ax[1].set_title('Prediction image')
+        ax[1].imshow(peaks)
+
+        plt.xticks([]), plt.yticks([])
+        plt.show()
+        '''
+        
         peaks = np.expand_dims(peaks, 0).astype(np.float32)
 
         peaks = peaks / 255.0
