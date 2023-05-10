@@ -11,13 +11,21 @@ from torchvision import transforms
 
 from utils.data_loading import SonarDataset
 from model import UNet
+from utils.cfar.CFAR import CFAR
 
 def predict_img(net,
                 full_img,
                 device,
                 scale_factor=1):
+    
+    Ntc = 20
+    Ngc = 4
+    Pfa = 5e-2
+    rank = Ntc // 2
+    cfar_detector = CFAR(Ntc, Ngc, Pfa, rank)
+
     net.eval()
-    img = SonarDataset.preprocessImg(full_img, scale_factor)
+    img = SonarDataset.preprocessImgCFAR(cfar_detector, full_img, scale_factor)
     img = img.unsqueeze(0)
     #print(f"Printed Shape In Predict = {img.shape}")
     img = img.to(device=device, dtype=torch.float32)

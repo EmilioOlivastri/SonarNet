@@ -7,6 +7,7 @@ from os import listdir
 from pathlib import Path
 from torch.utils.data import Dataset
 import math
+from utils.cfar.CFAR import CFAR
 
 class SonarDataset(Dataset):
     def __init__(self, images_dir: str, mask_dir: str, angle_dir: str, scale: float = 1.0):
@@ -22,6 +23,11 @@ class SonarDataset(Dataset):
         self.imgs.sort()
         self.labels_heat.sort()
         self.labels_yaw.sort()
+        Ntc = 20
+        Ngc = 4
+        Pfa = 5e-2
+        rank = Ntc // 2
+        self.cfar_detector = CFAR(Ntc, Ngc, Pfa, rank)
         
         if not self.imgs:
             raise RuntimeError(f'No input file found in {images_dir}, make sure you put your images there')
@@ -43,10 +49,30 @@ class SonarDataset(Dataset):
         img = np.asarray(pil_img)
 
         img = img / 255.0
-        if ( len(img.shape) == 3 ) :
-          img = img.transpose((2, 0, 1))
           
         return torch.from_numpy(img.astype(float))
+    
+    @staticmethod
+    def preprocessImgCFAR(cfar_detector, tensor_img, scale):
+        
+        transform = T.ToPILImage()
+        pil_img = transform(tensor_img)
+        w, h = pil_img.size
+        newW, newH = int(scale * w), int(scale * h)
+        assert newW > 0 and newH > 0, 'Scale is too small, resized images would have no pixel'
+        
+        pil_img = pil_img.resize((newW, newH), resample=Image.BICUBIC)
+        img = np.asarray(pil_img, dtype=np.float32)
+
+        #print(f'Img type = {img.dtype}')
+
+        peaks = cfar_detector.detect(img, 'GOCA')
+        peaks &= img > 10
+        peaks = np.expand_dims(peaks, 0).astype(np.float32)
+
+        peaks = peaks / 255.0
+          
+        return torch.from_numpy(peaks)
     
 
     @staticmethod
@@ -93,7 +119,7 @@ class SonarDataset(Dataset):
         heat  = read_image(str(self.mask_dir) + '/' + label_heat_name)
         img   = read_image(str(self.images_dir) + '/' + img_name)
         
-        img        = self.preprocessImg(img, self.scale)
+        img        = self.preprocessImgCFAR(self.cfar_detector, img, self.scale)
         mask_heat  = self.preprocessImg(heat, self.scale)
         yaw_label  = self.preprocessYaw(str(self.angle_dir) + '/' + label_yaw_name, 36) 
 

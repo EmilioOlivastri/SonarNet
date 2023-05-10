@@ -2,7 +2,7 @@ import math
 import numpy as np
 from scipy.optimize import root
 
-import cfar
+import utils.cfar.cfar as cfar
 
 class CFAR(object):
     """
