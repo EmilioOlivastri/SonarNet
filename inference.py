@@ -31,12 +31,10 @@ def predict_img(net,
     img = img.to(device=device, dtype=torch.float32)
 
     with torch.no_grad():
-        mask, angle = net(img)
-        mask = mask.detach().cpu()
-        angle = angle.detach().cpu()
+        mask = net(img).detach().cpu()
         mask = F.interpolate(mask, (full_img.shape[1], full_img.shape[2]), mode='bilinear')
         
-    return mask.long().squeeze().numpy(), angle.numpy()
+    return mask.long().squeeze().numpy()
 
 
 def get_args():
@@ -73,7 +71,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
     in_files = args.input
-    net = UNet(n_channels=3, n_classes=args.classes, bilinear=args.bilinear)
+    net = UNet(n_channels=1, n_classes=args.classes, bilinear=args.bilinear)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Loading model {args.model}')
